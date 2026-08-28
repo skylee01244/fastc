@@ -2,23 +2,22 @@
 
 #include "./parser.h"
 #include <unordered_map>
+#include <cassert>
 
 class Generator {
 public:
     inline Generator(NodeProg prog) :
         m_prog(std::move(prog)) {}
 
-    void gen_expr(const NodeExpr& expr) {
-        struct ExprVisitor {
+    void gen_term(const NodeTerm* term) {
+        struct TermVisitor {
             Generator* gen;
-            void operator()(const NodeExprIntLit& expr_int_lit) const
-            {
-                gen->m_output << "    mov rax, " << expr_int_lit.int_lit.value.value() << "\n";
+            void operator()(const NodeTermIntLit* term_int_lit) const {
+                gen->m_output << "    mov rax, " << term_int_lit->int_lit.value.value() << "\n";
                 gen->push("rax");
             }
-            void operator()(const NodeExprIdent& expr_ident) const
-            {
-                const auto name = expr_ident.ident.value.value();
+            void operator()(const NodeTermIdent* term_ident) const {
+                const auto name = term_ident->ident.value.value();
 
                 if (!gen->m_vars.contains(name)) {
                     std::cerr << "Undeclared identifier: " << name << std::endl;
@@ -29,11 +28,46 @@ public:
                 const size_t offset = (gen->m_stack_size - var.stack_location - 1) * 8;
                 gen->push("[rsp + " + std::to_string(offset) + "]");
             }
+        };
+        TermVisitor visitor({.gen = this});
+        std::visit(visitor, term->var);
+    }
 
+    void gen_expr(const NodeExpr* expr) {
+        struct ExprVisitor {
+            Generator* gen;
+
+            void operator()(const NodeTerm* term) const
+            {
+                gen->gen_term(term);
+            }
+
+            void operator()(const NodeBinExpr* bin_expr) const {
+                struct BinExprVisitor {
+                    Generator* gen;
+
+                    void operator()(const NodeBinExprAdd* add_expr) const {
+                        gen->gen_expr(add_expr->lhs);
+                        gen->gen_expr(add_expr->rhs);
+
+                        gen->pop("rbx");
+                        gen->pop("rax");
+                        gen->m_output << "    add rax, rbx\n";
+                        gen->push("rax");
+                    }
+
+                    void operator()(const NodeBinExprMulti* multi_expr) const {
+                        assert(false);
+                    }
+                };
+
+                BinExprVisitor visitor {.gen = gen};
+                std::visit(visitor, bin_expr->var);
+            }
         };
 
         ExprVisitor visitor {.gen = this};
-        std::visit(visitor, expr.var);
+        std::visit(visitor, expr->var);
     }
 
     void gen_stmt(const NodeStmt& stmt) {
