@@ -12,8 +12,14 @@ public:
             m_offset(m_buffer)
     {}
 
+
     template<typename T>
     T* alloc() {
+        size_t align = alignof(T);
+        auto current_addr = reinterpret_cast<uintptr_t>(m_offset);
+        size_t padding = (align - (current_addr % align)) % align;
+
+        m_offset += padding;
         void* offset = m_offset;
         m_offset += sizeof(T);
         return new (offset) T;
