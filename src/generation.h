@@ -7,7 +7,10 @@
 class Generator {
 public:
     inline Generator(NodeProg prog) :
-        m_prog(std::move(prog)) {}
+        m_prog(std::move(prog))
+        {
+            m_scopes.push_back({});
+        }
 
     void gen_term(const NodeTerm* term) {
         struct TermVisitor {
@@ -19,12 +22,21 @@ public:
             void operator()(const NodeTermIdent* term_ident) const {
                 const auto name = term_ident->ident.value.value();
 
-                if (!gen->m_vars.contains(name)) {
+                bool found = false;
+                Var var;
+                for (auto it = gen->m_scopes.rbegin(); it != gen->m_scopes.rend(); ++it) {
+                    if (it->contains(name)) {
+                        var = it->at(name);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
                     std::cerr << "Undeclared identifier: " << name << std::endl;
                     exit(EXIT_FAILURE);
                 }
 
-                const auto& var = gen->m_vars.at(name);
                 const size_t offset = (gen->m_stack_size - var.stack_location - 1) * 8;
                 gen->push("[rsp + " + std::to_string(offset) + "]");
             }
@@ -100,6 +112,28 @@ public:
         std::visit(visitor, expr->var);
     }
 
+    void begin_scope() {
+        m_scopes.push_back({});
+    }
+
+    void end_scope() {
+        const size_t pop_count = m_scopes.back().size();
+        m_scopes.pop_back();
+
+        if (pop_count > 0) {
+            m_output << "    add rsp, " << pop_count * 8 << "\n";
+            m_stack_size -= pop_count;
+        }
+    }
+
+    void gen_scope(const NodeScope* scope) {
+        begin_scope();
+        for (const NodeStmt& stmt : scope->stmts) {
+            gen_stmt(stmt);
+        }
+        end_scope();
+    }
+
     void gen_stmt(const NodeStmt& stmt) {
         struct StmtVisitor {
             Generator* gen;
@@ -112,13 +146,27 @@ public:
             }
             void operator()(const NodeStmtLet& stmt_let)
             {
-                if(gen->m_vars.contains(stmt_let.ident.value.value())) {
+                if(gen->m_scopes.back().contains(stmt_let.ident.value.value())) {
                     std::cerr << "Variable already exists: " << stmt_let.ident.value.value() << std::endl;
                     exit(EXIT_FAILURE);
                 }
-                gen->m_vars.insert({stmt_let.ident.value.value(), Var {.stack_location = gen->m_stack_size}});
+                gen->m_scopes.back().insert({stmt_let.ident.value.value(), Var {.stack_location = gen->m_stack_size}});
                 gen->gen_expr(stmt_let.expr);
             }
+            void operator()(const NodeScope* scope) {
+                gen->gen_scope(scope);
+            }
+            void operator()(const NodeStmtIf* stmt_if) {
+                gen->gen_expr(stmt_if->expr);
+                gen->pop("rax");
+
+                gen->m_output << "    test rax, rax\n";
+                std::string label = "label_end_" + std::to_string(gen->m_label_count++);
+                gen->m_output << "    jz " << label << "\n";
+                gen->gen_scope(stmt_if->scope);
+                gen->m_output << label << ":\n";
+            }   // Test the condition and skip the scope if it evaluates to zero.
+
         };
 
         StmtVisitor visitor {.gen = this};
@@ -161,5 +209,6 @@ private:
     const NodeProg m_prog;
     std::stringstream m_output;
     size_t m_stack_size = 0;
-    std::unordered_map<std::string, Var> m_vars {};
+    size_t m_label_count = 0;
+    std::vector<std::unordered_map<std::string, Var>> m_scopes {};
 };

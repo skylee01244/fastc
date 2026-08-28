@@ -6,6 +6,7 @@
 
 struct NodeExpr;
 struct NodeBinExpr;
+struct NodeScope;
 
 // Expressions
 
@@ -55,6 +56,11 @@ struct NodeExpr {
 
 // Statements
 
+struct NodeStmtIf {
+    NodeExpr* expr;
+    NodeScope* scope;
+};
+
 struct NodeStmtExit {
     NodeExpr* expr;
 };
@@ -65,7 +71,7 @@ struct NodeStmtLet {
 };
 
 struct NodeStmt {
-    std::variant<NodeStmtExit, NodeStmtLet> var;
+    std::variant<NodeStmtExit, NodeStmtLet, NodeScope*, NodeStmtIf*> var;
 };
 
 struct NodeProg {
@@ -74,6 +80,10 @@ struct NodeProg {
 
 struct NodeExit {
     NodeExpr expr;
+};
+
+struct NodeScope {
+    std::vector<NodeStmt> stmts;
 };
 
 class Parser {
@@ -94,6 +104,23 @@ public:
             default:
                 return {};
         }
+    }
+
+    std::optional<NodeScope*> parse_scope() {
+        try_consume(TokenType::open_curly, "Expected '{'");
+        auto scope = m_allocator.alloc<NodeScope>();
+
+        while (peek().has_value() && peek().value().type != TokenType::close_curly) {
+            if (auto stmt = parse_stmt()) {
+                scope->stmts.push_back(stmt.value());
+            } else {
+                std::cerr << "Invalid statement in scope" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        try_consume(TokenType::close_curly, "Expected '}'");
+        return scope;
     }
 
     std::optional<NodeTerm*> parse_term() {
@@ -248,6 +275,35 @@ public:
             }
             try_consume(TokenType::semi, "Expected ';'");
             return NodeStmt {.var = stmt_let};
+        }
+        else if (peek().has_value() && peek().value().type == TokenType::if_) {
+            consume();
+            try_consume(TokenType::open_paren, "Expected '('");
+
+            auto expr = parse_expr();
+            if (!expr.has_value()) {
+                std::cerr << "Invalid expression" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            try_consume(TokenType::close_paren, "Expected ')'");
+
+            auto scope = parse_scope();
+            if (!scope.has_value()) {
+                std::cerr << "Invalid scope" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            auto stmt_if = m_allocator.alloc<NodeStmtIf>();
+            stmt_if->expr = expr.value();
+            stmt_if->scope = scope.value();
+            return NodeStmt{.var = stmt_if};
+        }
+        else if (peek().has_value() && peek().value().type == TokenType::open_curly) {
+            if (auto scope = parse_scope()) {
+                return NodeStmt{.var = scope.value()};
+            }
+            return {};
         }
         else {return {};}
     }
