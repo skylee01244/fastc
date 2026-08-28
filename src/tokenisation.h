@@ -12,10 +12,8 @@ enum class TokenType {
     ident,
     let,
     eq,
-    plus,
-    star,
-    fslash,
-    minus
+    plus, star, fslash, minus,
+    if_, open_curly, close_curly
 };
 
 struct Token {
@@ -43,6 +41,11 @@ public:
                 }
                 else if(buf == "let") {
                     tokens.push_back({.type = TokenType::let, .value = buf});
+                    buf.clear();
+                    continue;
+                }
+                else if(buf == "if") {
+                    tokens.push_back({.type = TokenType::if_});
                     buf.clear();
                     continue;
                 }
@@ -99,6 +102,16 @@ public:
             else if(peek().value() == '-') {
                 consume();
                 tokens.push_back({.type = TokenType::minus});
+                continue;
+            }
+            else if(peek().value() == '{') {
+                consume();
+                tokens.push_back({.type = TokenType::open_curly});
+                continue;
+            }
+            else if(peek().value() == '}') {
+                consume();
+                tokens.push_back({.type = TokenType::close_curly});
                 continue;
             }
             else if(std::isspace(peek().value())) {
