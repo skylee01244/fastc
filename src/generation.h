@@ -156,16 +156,41 @@ public:
             void operator()(const NodeScope* scope) {
                 gen->gen_scope(scope);
             }
-            void operator()(const NodeStmtIf* stmt_if) {
+            void operator()(const NodeStmtIf* stmt_if) {    // if/elif/else chain
+                std::string label_end = "label_end_" + std::to_string(gen->m_label_count++);
+
                 gen->gen_expr(stmt_if->expr);
                 gen->pop("rax");
-
                 gen->m_output << "    test rax, rax\n";
-                std::string label = "label_end_" + std::to_string(gen->m_label_count++);
-                gen->m_output << "    jz " << label << "\n";
+
+                std::string label_next = "label_next_" + std::to_string(gen->m_label_count++);
+
+                // jump to the next block
+                gen->m_output << "    jz " << label_next << "\n";
+
+                // execute scope and jump to end
                 gen->gen_scope(stmt_if->scope);
-                gen->m_output << label << ":\n";
-            }   // Test the condition and skip the scope if it evaluates to zero.
+                gen->m_output << "    jmp " << label_end << "\n";
+                gen->m_output << label_next << ":\n";
+
+                for (const auto* elif : stmt_if->elifs) {
+                    label_next = "label_next_" + std::to_string(gen->m_label_count++);
+                    gen->gen_expr(elif->expr);
+                    gen->pop("rax");
+                    gen->m_output << "    test rax, rax\n";
+                    gen->m_output << "    jz " << label_next << "\n";
+
+                    gen->gen_scope(elif->scope);
+                    gen->m_output << "    jmp " << label_end << "\n";
+                    gen->m_output << label_next << ":\n";
+                }
+
+                if (stmt_if->els.has_value()) {
+                    gen->gen_scope(stmt_if->els.value());
+                }
+
+                gen->m_output << label_end << ":\n";
+            }
 
         };
 
