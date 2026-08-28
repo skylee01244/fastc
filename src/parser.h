@@ -56,9 +56,16 @@ struct NodeExpr {
 
 // Statements
 
+struct NodeStmtElif {
+    NodeExpr* expr;
+    NodeScope* scope;
+};
+
 struct NodeStmtIf {
     NodeExpr* expr;
     NodeScope* scope;
+    std::vector<NodeStmtElif*> elifs;
+    std::optional<NodeScope*> els;
 };
 
 struct NodeStmtExit {
@@ -297,6 +304,44 @@ public:
             auto stmt_if = m_allocator.alloc<NodeStmtIf>();
             stmt_if->expr = expr.value();
             stmt_if->scope = scope.value();
+
+            // look for else if / else
+            while (peek().has_value() && peek().value().type == TokenType::else_) {
+                if (peek(1).has_value() && peek(1).value().type == TokenType::if_) {
+                    consume(); // else
+                    consume(); // if
+                    try_consume(TokenType::open_paren, "Expected '('");
+
+                    auto elif_expr = parse_expr();
+                    if (!elif_expr.has_value()) {
+                        std::cerr << "Invalid expression in else if" << std::endl;
+                        exit(EXIT_FAILURE);
+                    }
+
+                    try_consume(TokenType::close_paren, "Expected ')'");
+
+                    auto elif_scope = parse_scope();
+                    if (!elif_scope.has_value()) {
+                        std::cerr << "Invalid scope in else if" << std::endl;
+                        exit(EXIT_FAILURE);
+                    }
+
+                    auto stmt_elif = m_allocator.alloc<NodeStmtElif>();
+                    stmt_elif->expr = elif_expr.value();
+                    stmt_elif->scope = elif_scope.value();
+                    stmt_if->elifs.push_back(stmt_elif);
+                } else {
+                    consume(); // Consume 'else'
+                    auto els_scope = parse_scope();
+                    if (!els_scope.has_value()) {
+                        std::cerr << "Invalid scope in else" << std::endl;
+                        exit(EXIT_FAILURE);
+                    }
+                    stmt_if->els = els_scope.value();
+                    break; // else terminates the chain
+                }
+            }
+
             return NodeStmt{.var = stmt_if};
         }
         else if (peek().has_value() && peek().value().type == TokenType::open_curly) {
