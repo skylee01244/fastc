@@ -9,6 +9,10 @@ struct NodeBinExpr;
 
 // Expressions
 
+struct NodeTermParen {
+    NodeExpr* expr;
+};
+
 struct NodeTermIntLit {
     Token int_lit;
 };
@@ -32,12 +36,17 @@ struct NodeBinExprDiv {
     NodeExpr* rhs;
 };
 
+struct NodeBinExprSub {
+    NodeExpr* lhs;
+    NodeExpr* rhs;
+};
+
 struct NodeBinExpr {
-    std::variant<NodeBinExprAdd*, NodeBinExprMulti*, NodeBinExprDiv*> var;
+    std::variant<NodeBinExprAdd*, NodeBinExprMulti*, NodeBinExprDiv*, NodeBinExprSub*> var;
 };
 
 struct NodeTerm {
-    std::variant<NodeTermIntLit*, NodeTermIdent*> var;
+    std::variant<NodeTermIntLit*, NodeTermIdent*, NodeTermParen*> var;
 };
 
 struct NodeExpr {
@@ -77,6 +86,7 @@ public:
     std::optional<int> bin_precedence(TokenType type) {
         switch (type) {
             case TokenType::plus:
+            case TokenType::minus:
                 return 0;
             case TokenType::star:
             case TokenType::fslash:
@@ -99,6 +109,20 @@ public:
             term_ident->ident = ident.value();
             auto term = m_allocator.alloc<NodeTerm>();
             term->var = term_ident;
+            return term;
+        }
+        else if (try_consume(TokenType::open_paren).has_value()) {
+            auto expr = parse_expr();
+            if (!expr.has_value()) {
+                std::cerr << "Expected expression inside parentheses" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+            try_consume(TokenType::close_paren, "Expected ')'");
+
+            auto term_paren = m_allocator.alloc<NodeTermParen>();
+            term_paren->expr = expr.value();
+            auto term = m_allocator.alloc<NodeTerm>();
+            term->var = term_paren;
             return term;
         }
         else {return {};}
@@ -168,6 +192,11 @@ public:
                 add->lhs = expr_lhs;
                 add->rhs = expr_rhs.value();
                 bin_expr->var = add;
+            } else if (op.type == TokenType::minus) {
+                auto sub = m_allocator.alloc<NodeBinExprSub>();
+                sub->lhs = expr_lhs;
+                sub->rhs = expr_rhs.value();
+                bin_expr->var = sub;
             } else if (op.type == TokenType::star) {
                 auto multi = m_allocator.alloc<NodeBinExprMulti>();
                 multi->lhs = expr_lhs;
