@@ -28,6 +28,9 @@ public:
                 const size_t offset = (gen->m_stack_size - var.stack_location - 1) * 8;
                 gen->push("[rsp + " + std::to_string(offset) + "]");
             }
+            void operator()(const NodeTermParen* term_paren) const {
+                gen->gen_expr(term_paren->expr);
+            }
         };
         TermVisitor visitor({.gen = this});
         std::visit(visitor, term->var);
@@ -78,8 +81,16 @@ public:
                         // rax holds quotient
                         // rdx holds remainder
                     }
-                };
 
+                    void operator()(const NodeBinExprSub* sub_expr) const {
+                        gen->gen_expr(sub_expr->lhs);
+                        gen->gen_expr(sub_expr->rhs);
+                        gen->pop("rbx");
+                        gen->pop("rax");
+                        gen->m_output << "    sub rax, rbx\n";
+                        gen->push("rax");
+                    }
+                };
                 BinExprVisitor visitor {.gen = gen};
                 std::visit(visitor, bin_expr->var);
             }
