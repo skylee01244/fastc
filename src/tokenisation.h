@@ -13,7 +13,7 @@ enum class TokenType {
     let,
     eq,
     plus, star, fslash, minus,
-    if_, open_curly, close_curly
+    if_, else_, open_curly, close_curly
 };
 
 struct Token {
@@ -46,6 +46,11 @@ public:
                 }
                 else if(buf == "if") {
                     tokens.push_back({.type = TokenType::if_});
+                    buf.clear();
+                    continue;
+                }
+                else if(buf == "else") {
+                    tokens.push_back({.type = TokenType::else_});
                     buf.clear();
                     continue;
                 }
@@ -92,6 +97,14 @@ public:
             else if(peek().value() == '*') {
                 consume();
                 tokens.push_back({.type = TokenType::star});
+                continue;
+            }
+            else if(peek().value() == '/' && peek(1).has_value() && peek(1).value() == '/') {
+                consume();
+                consume();
+                while(peek().has_value() && peek().value() != '\n') {
+                    consume();
+                }
                 continue;
             }
             else if(peek().value() == '/') {
