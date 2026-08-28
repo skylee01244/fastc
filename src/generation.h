@@ -49,7 +49,6 @@ public:
                     void operator()(const NodeBinExprAdd* add_expr) const {
                         gen->gen_expr(add_expr->lhs);
                         gen->gen_expr(add_expr->rhs);
-
                         gen->pop("rbx");
                         gen->pop("rax");
                         gen->m_output << "    add rax, rbx\n";
@@ -57,7 +56,27 @@ public:
                     }
 
                     void operator()(const NodeBinExprMulti* multi_expr) const {
-                        assert(false);
+                        gen->gen_expr(multi_expr->lhs);
+                        gen->gen_expr(multi_expr->rhs);
+                        gen->pop("rbx");
+                        gen->pop("rax");
+                        gen->m_output << "    mul rbx\n";
+                        gen->push("rax");
+                    }
+
+                    void operator()(const NodeBinExprDiv* div_expr) const {
+                        gen->gen_expr(div_expr->lhs);
+                        gen->gen_expr(div_expr->rhs);
+                        gen->pop("rbx");
+                        gen->pop("rax");
+
+                        // zero out rdx before division
+                        gen->m_output << "    xor rdx, rdx\n";
+
+                        gen->m_output << "    div rbx\n";
+                        gen->push("rax");
+                        // rax holds quotient
+                        // rdx holds remainder
                     }
                 };
 
