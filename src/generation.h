@@ -191,7 +191,29 @@ public:
 
                 gen->m_output << label_end << ":\n";
             }
+            void operator()(const NodeStmtAssign& stmt_assign) {
+                const auto name = stmt_assign.ident.value.value();
 
+                bool found = false;
+                Var var;
+                for (auto it = gen->m_scopes.rbegin(); it != gen->m_scopes.rend(); ++it) {
+                    if (it->contains(name)) {
+                        var = it->at(name);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    std::cerr << "Undeclared identifier in assignment: " << name << std::endl;
+                    exit(EXIT_FAILURE);
+                }
+                gen->gen_expr(stmt_assign.expr);
+                gen->pop("rax");
+                const size_t offset = (gen->m_stack_size - var.stack_location - 1) * 8;
+
+                gen->m_output << "    mov [rsp + " << offset << "], rax\n";
+            }
         };
 
         StmtVisitor visitor {.gen = this};

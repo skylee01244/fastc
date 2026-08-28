@@ -77,8 +77,13 @@ struct NodeStmtLet {
     NodeExpr* expr;
 };
 
+struct NodeStmtAssign {
+    Token ident;
+    NodeExpr* expr;
+};
+
 struct NodeStmt {
-    std::variant<NodeStmtExit, NodeStmtLet, NodeScope*, NodeStmtIf*> var;
+    std::variant<NodeStmtExit, NodeStmtLet, NodeScope*, NodeStmtIf*, NodeStmtAssign> var;
 };
 
 struct NodeProg {
@@ -161,33 +166,6 @@ public:
         }
         else {return {};}
     }
-
-//    std::optional<NodeExpr*> parse_expr() {
-//        if(auto term = parse_term()) {
-//            if(try_consume(TokenType::plus).has_value()) {
-//                auto bin_expr = m_allocator.alloc<NodeBinExpr>();
-//                auto bin_expr_add = m_allocator.alloc<NodeBinExprAdd>();
-//                auto lhs_expr = m_allocator.alloc<NodeExpr>();
-//                lhs_expr->var = term.value();
-//                bin_expr_add->lhs = lhs_expr;
-//                if (auto rhs = parse_expr()) {
-//                    bin_expr_add->rhs = rhs.value();
-//                    bin_expr->var = bin_expr_add;
-//                    auto expr = m_allocator.alloc<NodeExpr>();
-//                    expr->var = bin_expr;
-//                    return expr;
-//                } else {
-//                    std::cerr << "Expected expression" << std::endl;
-//                    exit(EXIT_FAILURE);
-//                }
-//            }
-//            else {
-//                auto expr = m_allocator.alloc<NodeExpr>();
-//                expr->var = term.value();
-//                return expr;
-//            }
-//        } else {return {};}
-//    }
 
     std::optional<NodeExpr*> parse_expr(int min_prec = 0) {
         std::optional<NodeTerm*> term_lhs = parse_term();
@@ -343,6 +321,21 @@ public:
             }
 
             return NodeStmt{.var = stmt_if};
+        }
+        else if (peek().has_value() && peek().value().type == TokenType::ident
+                 && peek(1).has_value() && peek(1).value().type == TokenType::eq) {
+            auto stmt_assign = NodeStmtAssign {.ident = consume()};
+            consume();
+
+            if (auto expr = parse_expr()) {
+                stmt_assign.expr = expr.value();
+            } else {
+                std::cerr << "Invalid expression in assignment" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            try_consume(TokenType::semi, "Expected ';'");
+            return NodeStmt {.var = stmt_assign};
         }
         else if (peek().has_value() && peek().value().type == TokenType::open_curly) {
             if (auto scope = parse_scope()) {
