@@ -14,7 +14,8 @@ enum class TokenType {
     eq,
     plus,
     star,
-    fslash
+    fslash,
+    minus
 };
 
 struct Token {
@@ -93,6 +94,11 @@ public:
             else if(peek().value() == '/') {
                 consume();
                 tokens.push_back({.type = TokenType::fslash});
+                continue;
+            }
+            else if(peek().value() == '-') {
+                consume();
+                tokens.push_back({.type = TokenType::minus});
                 continue;
             }
             else if(std::isspace(peek().value())) {
