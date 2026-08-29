@@ -275,6 +275,51 @@ public:
 
                 gen->m_output << "    mov [rsp + " << offset << "], rax\n";
             }
+            void operator()(const NodeStmtWhile* stmt_while) {
+                std::string label_start = "label_start_" + std::to_string(gen->m_label_count++);
+                std::string label_end = "label_end_" + std::to_string(gen->m_label_count++);
+
+                gen->m_output << label_start << ":\n";
+
+                gen->gen_expr(stmt_while->expr);
+                gen->pop("rax");
+                gen->m_output << "    test rax, rax\n";
+                gen->m_output << "    jz " << label_end << "\n";
+
+                gen->gen_scope(stmt_while->scope);
+
+                // jump back to re-evaluate the condition
+                gen->m_output << "    jmp " << label_start << "\n";
+
+                gen->m_output << label_end << ":\n";
+            }
+
+            void operator()(const NodeStmtFor* stmt_for) {
+                gen->begin_scope();
+
+                gen->gen_stmt(*(stmt_for->init));
+
+                std::string label_start = "label_start_" + std::to_string(gen->m_label_count++);
+                std::string label_end = "label_end_" + std::to_string(gen->m_label_count++);
+
+                gen->m_output << label_start << ":\n";
+
+                gen->gen_expr(stmt_for->cond);
+                gen->pop("rax");
+                gen->m_output << "    test rax, rax\n";
+                gen->m_output << "    jz " << label_end << "\n";
+
+                // run body
+                gen->gen_scope(stmt_for->scope);
+
+                // run iteration assignment
+                gen->gen_stmt(*(stmt_for->iter));
+
+                gen->m_output << "    jmp " << label_start << "\n";
+                gen->m_output << label_end << ":\n";
+
+                gen->end_scope();
+            }
         };
 
         StmtVisitor visitor {.gen = this};

@@ -7,6 +7,7 @@
 struct NodeExpr;
 struct NodeBinExpr;
 struct NodeScope;
+struct NodeStmt;
 
 // Expressions
 
@@ -90,8 +91,20 @@ struct NodeStmtAssign {
     NodeExpr* expr;
 };
 
+struct NodeStmtWhile {
+    NodeExpr* expr;
+    NodeScope* scope;
+};
+
+struct NodeStmtFor {
+    NodeStmt* init;
+    NodeExpr* cond;
+    NodeStmt* iter;
+    NodeScope* scope;
+};
+
 struct NodeStmt {
-    std::variant<NodeStmtExit, NodeStmtLet, NodeScope*, NodeStmtIf*, NodeStmtAssign> var;
+    std::variant<NodeStmtExit, NodeStmtLet, NodeScope*, NodeStmtIf*, NodeStmtAssign, NodeStmtWhile*, NodeStmtFor*> var;
 };
 
 struct NodeProg {
@@ -367,6 +380,80 @@ public:
             }
 
             return NodeStmt{.var = stmt_if};
+        }
+        // while llop
+        else if (peek().has_value() && peek().value().type == TokenType::while_) {
+            consume();
+            try_consume(TokenType::open_paren, "Expected '('");
+
+            auto expr = parse_expr();
+            if (!expr.has_value()) {
+                std::cerr << "Invalid expression in while loop" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            try_consume(TokenType::close_paren, "Expected ')'");
+
+            auto scope = parse_scope();
+            if (!scope.has_value()) {
+                std::cerr << "Invalid scope in while loop" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            auto stmt_while = m_allocator.alloc<NodeStmtWhile>();
+            stmt_while->expr = expr.value();
+            stmt_while->scope = scope.value();
+            return NodeStmt{.var = stmt_while};
+        }
+        // for loop
+        else if (peek().has_value() && peek().value().type == TokenType::for_) {
+            consume();
+            try_consume(TokenType::open_paren, "Expected '('");
+
+            auto stmt_for = m_allocator.alloc<NodeStmtFor>();
+
+            auto init_node = parse_stmt();
+            if (!init_node.has_value()) {
+                std::cerr << "Invalid initialization in for loop" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+            stmt_for->init = m_allocator.alloc<NodeStmt>();
+            *(stmt_for->init) = init_node.value();
+
+            auto cond_node = parse_expr();
+            if (!cond_node.has_value()) {
+                std::cerr << "Invalid condition in for loop" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+            stmt_for->cond = cond_node.value();
+            try_consume(TokenType::semi, "Expected ';'");
+
+            if (peek().has_value() && peek().value().type == TokenType::ident && peek(1).has_value() && peek(1).value().type == TokenType::eq) {
+                auto stmt_assign = NodeStmtAssign {.ident = consume()};
+                consume(); // Consume '='
+                if (auto expr = parse_expr()) {
+                    stmt_assign.expr = expr.value();
+                } else {
+                    std::cerr << "Invalid update expression in for loop" << std::endl;
+                    exit(EXIT_FAILURE);
+                }
+                stmt_for->iter = m_allocator.alloc<NodeStmt>();
+                *(stmt_for->iter) = NodeStmt{.var = stmt_assign};
+            } else {
+                std::cerr << "Expected assignment in for loop update" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            try_consume(TokenType::close_paren, "Expected ')'");
+
+            if (auto scope = parse_scope()) {
+                stmt_for->scope = scope.value();
+            } else {
+                std::cerr << "Invalid scope in for loop" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            return NodeStmt{.var = stmt_for};
         }
         else if (peek().has_value() && peek().value().type == TokenType::ident
                  && peek(1).has_value() && peek(1).value().type == TokenType::eq) {

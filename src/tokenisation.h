@@ -14,7 +14,8 @@ enum class TokenType {
     eq,
     plus, star, fslash, minus,
     if_, else_, open_curly, close_curly,
-    eq_eq, nott_eq, less, less_eq, greater, greater_eq
+    eq_eq, nott_eq, less, less_eq, greater, greater_eq,
+    while_, for_
 };
 
 struct Token {
@@ -52,6 +53,16 @@ public:
                 }
                 else if(buf == "else") {
                     tokens.push_back({.type = TokenType::else_});
+                    buf.clear();
+                    continue;
+                }
+                else if(buf == "while") {
+                    tokens.push_back({.type = TokenType::while_});
+                    buf.clear();
+                    continue;
+                }
+                else if(buf == "for") {
+                    tokens.push_back({.type = TokenType::for_});
                     buf.clear();
                     continue;
                 }
