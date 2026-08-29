@@ -13,7 +13,8 @@ enum class TokenType {
     let,
     eq,
     plus, star, fslash, minus,
-    if_, else_, open_curly, close_curly
+    if_, else_, open_curly, close_curly,
+    eq_eq, nott_eq, less, less_eq, greater, greater_eq
 };
 
 struct Token {
@@ -84,11 +85,6 @@ public:
                 tokens.push_back({.type = TokenType::semi});
                 continue;
             }
-            else if(peek().value() == '=') {
-                consume();
-                tokens.push_back({.type = TokenType::eq});
-                continue;
-            }
             else if(peek().value() == '+') {
                 consume();
                 tokens.push_back({.type = TokenType::plus});
@@ -125,6 +121,47 @@ public:
             else if(peek().value() == '}') {
                 consume();
                 tokens.push_back({.type = TokenType::close_curly});
+                continue;
+            }
+            else if(peek().value() == '=') {
+                consume();
+                if (peek().has_value() && peek().value() == '=') {
+                    consume();
+                    tokens.push_back({.type = TokenType::eq_eq});
+                } else {
+                    tokens.push_back({.type = TokenType::eq});
+                }
+                continue;
+            }
+            else if(peek().value() == '!') {
+                consume();
+                if (peek().has_value() && peek().value() == '=') {
+                    consume();
+                    tokens.push_back({.type = TokenType::nott_eq});
+                } else {
+                    std::cerr << "Expected '=' after '!'" << std::endl;
+                    exit(EXIT_FAILURE);
+                }
+                continue;
+            }
+            else if(peek().value() == '<') {
+                consume();
+                if (peek().has_value() && peek().value() == '=') {
+                    consume();
+                    tokens.push_back({.type = TokenType::less_eq});
+                } else {
+                    tokens.push_back({.type = TokenType::less});
+                }
+                continue;
+            }
+            else if(peek().value() == '>') {
+                consume();
+                if (peek().has_value() && peek().value() == '=') {
+                    consume();
+                    tokens.push_back({.type = TokenType::greater_eq});
+                } else {
+                    tokens.push_back({.type = TokenType::greater});
+                }
                 continue;
             }
             else if(std::isspace(peek().value())) {

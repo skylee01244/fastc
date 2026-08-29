@@ -102,6 +102,67 @@ public:
                         gen->m_output << "    sub rax, rbx\n";
                         gen->push("rax");
                     }
+
+                    void operator()(const NodeBinExprEq* eq_expr) const {
+                        gen->gen_expr(eq_expr->lhs);
+                        gen->gen_expr(eq_expr->rhs);
+                        gen->pop("rbx");
+                        gen->pop("rax");
+                        gen->m_output << "    cmp rax, rbx\n";
+                        gen->m_output << "    sete al\n";
+                        gen->m_output << "    movzx rax, al\n";
+                        gen->push("rax");
+                    }
+                    void operator()(const NodeBinExprNotEq* neq_expr) const {
+                        gen->gen_expr(neq_expr->lhs);
+                        gen->gen_expr(neq_expr->rhs);
+                        gen->pop("rbx");
+                        gen->pop("rax");
+                        gen->m_output << "    cmp rax, rbx\n";
+                        gen->m_output << "    setne al\n";
+                        gen->m_output << "    movzx rax, al\n";
+                        gen->push("rax");
+                    }
+                    void operator()(const NodeBinExprLess* less_expr) const {
+                        gen->gen_expr(less_expr->lhs);
+                        gen->gen_expr(less_expr->rhs);
+                        gen->pop("rbx");
+                        gen->pop("rax");
+                        gen->m_output << "    cmp rax, rbx\n";
+                        gen->m_output << "    setl al\n";
+                        gen->m_output << "    movzx rax, al\n";
+                        gen->push("rax");
+                    }
+                    void operator()(const NodeBinExprLessEq* less_eq_expr) const {
+                        gen->gen_expr(less_eq_expr->lhs);
+                        gen->gen_expr(less_eq_expr->rhs);
+                        gen->pop("rbx");
+                        gen->pop("rax");
+                        gen->m_output << "    cmp rax, rbx\n";
+                        gen->m_output << "    setle al\n";
+                        gen->m_output << "    movzx rax, al\n";
+                        gen->push("rax");
+                    }
+                    void operator()(const NodeBinExprGreater* greater_expr) const {
+                        gen->gen_expr(greater_expr->lhs);
+                        gen->gen_expr(greater_expr->rhs);
+                        gen->pop("rbx");
+                        gen->pop("rax");
+                        gen->m_output << "    cmp rax, rbx\n";
+                        gen->m_output << "    setg al\n";
+                        gen->m_output << "    movzx rax, al\n";
+                        gen->push("rax");
+                    }
+                    void operator()(const NodeBinExprGreaterEq* greater_eq_expr) const {
+                        gen->gen_expr(greater_eq_expr->lhs);
+                        gen->gen_expr(greater_eq_expr->rhs);
+                        gen->pop("rbx");
+                        gen->pop("rax");
+                        gen->m_output << "    cmp rax, rbx\n";
+                        gen->m_output << "    setge al\n";
+                        gen->m_output << "    movzx rax, al\n";
+                        gen->push("rax");
+                    }
                 };
                 BinExprVisitor visitor {.gen = gen};
                 std::visit(visitor, bin_expr->var);

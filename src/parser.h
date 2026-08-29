@@ -10,6 +10,13 @@ struct NodeScope;
 
 // Expressions
 
+struct NodeBinExprEq { NodeExpr* lhs; NodeExpr* rhs; };
+struct NodeBinExprNotEq { NodeExpr* lhs; NodeExpr* rhs; };
+struct NodeBinExprLess { NodeExpr* lhs; NodeExpr* rhs; };
+struct NodeBinExprLessEq { NodeExpr* lhs; NodeExpr* rhs; };
+struct NodeBinExprGreater { NodeExpr* lhs; NodeExpr* rhs; };
+struct NodeBinExprGreaterEq { NodeExpr* lhs; NodeExpr* rhs; };
+
 struct NodeTermParen {
     NodeExpr* expr;
 };
@@ -43,7 +50,8 @@ struct NodeBinExprSub {
 };
 
 struct NodeBinExpr {
-    std::variant<NodeBinExprAdd*, NodeBinExprMulti*, NodeBinExprDiv*, NodeBinExprSub*> var;
+    std::variant<NodeBinExprAdd*, NodeBinExprMulti*, NodeBinExprDiv*, NodeBinExprSub*,
+            NodeBinExprEq*, NodeBinExprNotEq*, NodeBinExprLess*, NodeBinExprLessEq*, NodeBinExprGreater*, NodeBinExprGreaterEq*> var;
 };
 
 struct NodeTerm {
@@ -107,12 +115,19 @@ public:
 
     std::optional<int> bin_precedence(TokenType type) {
         switch (type) {
+            case TokenType::eq_eq:
+            case TokenType::nott_eq:
+            case TokenType::less:
+            case TokenType::less_eq:
+            case TokenType::greater:
+            case TokenType::greater_eq:
+                return 0;
             case TokenType::plus:
             case TokenType::minus:
-                return 0;
+                return 1;
             case TokenType::star:
             case TokenType::fslash:
-                return 1;
+                return 2;
             default:
                 return {};
         }
@@ -219,6 +234,37 @@ public:
                 div->lhs = expr_lhs;
                 div->rhs = expr_rhs.value();
                 bin_expr->var = div;
+            }
+            else if (op.type == TokenType::eq_eq) {
+                auto eq = m_allocator.alloc<NodeBinExprEq>();
+                eq->lhs = expr_lhs;
+                eq->rhs = expr_rhs.value();
+                bin_expr->var = eq;
+            } else if (op.type == TokenType::nott_eq) {
+                auto neq = m_allocator.alloc<NodeBinExprNotEq>();
+                neq->lhs = expr_lhs;
+                neq->rhs = expr_rhs.value();
+                bin_expr->var = neq;
+            } else if (op.type == TokenType::less) {
+                auto less = m_allocator.alloc<NodeBinExprLess>();
+                less->lhs = expr_lhs;
+                less->rhs = expr_rhs.value();
+                bin_expr->var = less;
+            } else if (op.type == TokenType::less_eq) {
+                auto less_eq = m_allocator.alloc<NodeBinExprLessEq>();
+                less_eq->lhs = expr_lhs;
+                less_eq->rhs = expr_rhs.value();
+                bin_expr->var = less_eq;
+            } else if (op.type == TokenType::greater) {
+                auto greater = m_allocator.alloc<NodeBinExprGreater>();
+                greater->lhs = expr_lhs;
+                greater->rhs = expr_rhs.value();
+                bin_expr->var = greater;
+            } else if (op.type == TokenType::greater_eq) {
+                auto greater_eq = m_allocator.alloc<NodeBinExprGreaterEq>();
+                greater_eq->lhs = expr_lhs;
+                greater_eq->rhs = expr_rhs.value();
+                bin_expr->var = greater_eq;
             }
 
             auto new_expr_lhs = m_allocator.alloc<NodeExpr>();
